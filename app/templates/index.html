@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image to Text</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            text-align: center;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            padding: 10px;
+            font-size: 16px;
+            width: 300px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+<h1>Enter Text for the Received Image</h1>
+<img src="/static/received_image.png" alt="Received Image" id="received-image">
+<br>
+<input type="text" id="input-text" placeholder="Enter text here">
+<button onclick="sendText()">Submit</button>
+
+<script>
+    let websocket;
+    let clientId = Math.random().toString(36).substring(2, 15);
+
+    function connectWebSocket() {
+        websocket = new WebSocket(`ws://localhost:8000/ws/${clientId}`);
+
+        websocket.onmessage = function(event) {
+            alert(event.data);
+        };
+
+        websocket.onclose = function(event) {
+            console.log('WebSocket closed.');
+        };
+    }
+
+    function sendText() {
+        let inputText = document.getElementById('input-text').value;
+        if (inputText && websocket.readyState === WebSocket.OPEN) {
+            websocket.send(inputText);
+        } else {
+            alert('Connection is not open or text is empty.');
+        }
+    }
+
+    window.onload = connectWebSocket;
+</script>
+</body>
+</html>

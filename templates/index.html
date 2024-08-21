@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Upload</title>
+</head>
+<body>
+    <h1>Upload an Image</h1>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input type="file" id="imageInput" name="image" accept="image/*">
+        <button type="submit">Upload</button>
+    </form>
+
+    <h2>Received Image</h2>
+    <img id="uploadedImage" src="/static/received_image.png" alt="Uploaded Image" width="300px">
+
+    <h1>WebSocket Communication</h1>
+    <form id="wsForm">
+        <input type="text" id="textInput" placeholder="Enter text">
+        <button type="submit">Send</button>
+    </form>
+    <p id="response"></p>
+
+    <script>
+        const ws = new WebSocket("ws://localhost:8000/ws/client1");
+
+        document.getElementById("uploadForm").onsubmit = async function(event) {
+            event.preventDefault();
+            const formData = new FormData();
+            formData.append("image", document.getElementById("imageInput").files[0]);
+
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            console.log(result);
+
+            // Reload the image after uploading
+            document.getElementById("uploadedImage").src = "/static/received_image.png?" + new Date().getTime();
+        };
+
+        document.getElementById("wsForm").onsubmit = function(event) {
+            event.preventDefault();
+            const text = document.getElementById("textInput").value;
+            ws.send(text);
+            document.getElementById("textInput").value = ''; // Clear the input field after sending
+        };
+
+        ws.onmessage = function(event) {
+            document.getElementById("response").innerText = event.data;
+        };
+    </script>
+</body>
+</html>
