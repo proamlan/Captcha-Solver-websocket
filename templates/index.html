@@ -1,57 +1,30 @@
+<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Upload</title>
+    <title>Image Input</title>
 </head>
 <body>
-    <h1>Upload an Image</h1>
-    <form id="uploadForm" enctype="multipart/form-data">
-        <input type="file" id="imageInput" name="image" accept="image/*">
-        <button type="submit">Upload</button>
-    </form>
+    <h1>Received Image</h1>
+    <img id="image" alt="Image will be displayed here" />
+    <br/>
+    <input type="text" id="userInput" placeholder="Enter text" />
+    <button onclick="sendText()">Send</button>
 
-    <h2>Received Image</h2>
-    <img id="uploadedImage" src="/static/received_image.png" alt="Uploaded Image" width="300px">
-
-    <h1>WebSocket Communication</h1>
-    <form id="wsForm">
-        <input type="text" id="textInput" placeholder="Enter text">
-        <button type="submit">Send</button>
-    </form>
-    <p id="response"></p>
-
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <script>
-        const ws = new WebSocket("ws://localhost:8000/ws/client1");
+        var socket = io();
 
-        document.getElementById("uploadForm").onsubmit = async function(event) {
-            event.preventDefault();
-            const formData = new FormData();
-            formData.append("image", document.getElementById("imageInput").files[0]);
+        socket.on('display_image', function(data) {
+            document.getElementById('image').src = "data:image/png;base64," + data.image;
+        });
 
-            const response = await fetch('/upload', {
-                method: 'POST',
-                body: formData
-            });
-
-            const result = await response.json();
-            console.log(result);
-
-            // Reload the image after uploading
-            document.getElementById("uploadedImage").src = "/static/received_image.png?" + new Date().getTime();
-        };
-
-        document.getElementById("wsForm").onsubmit = function(event) {
-            event.preventDefault();
-            const text = document.getElementById("textInput").value;
-            ws.send(text);
-            document.getElementById("textInput").value = ''; // Clear the input field after sending
-        };
-
-        ws.onmessage = function(event) {
-            document.getElementById("response").innerText = event.data;
-        };
+        function sendText() {
+            var text = document.getElementById('userInput').value;
+            socket.emit('send_text', {text: text});
+        }
     </script>
 </body>
 </html>

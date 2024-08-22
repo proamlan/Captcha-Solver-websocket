@@ -1,38 +1,34 @@
-import asyncio
-import websockets
-import requests
-import os
+# client.py
+import base64
+import socketio
+
+sio = socketio.Client()
 
 
-async def websocket_client():
-    uri = "ws://localhost:8000/ws/client1"
-
-    async with websockets.connect(uri) as websocket:
-        while True:
-            message = await websocket.recv()
-            print(f"Received: {message}")
-
-            # Simulate user input after receiving a message
-            user_input = input("Enter text to send: ")
-            await websocket.send(user_input)
+@sio.event
+def connect():
+    print('Connected to server')
 
 
-def upload_image(image_path):
-    url = "http://localhost:8000/upload"
-    with open(image_path, 'rb') as image_file:
-        files = {'image': image_file}
-        response = requests.post(url, files=files)
-    print(response.json())
+@sio.event
+def disconnect():
+    print('Disconnected from server')
 
 
-if __name__ == "__main__":
-    image_path = "captcha_08609_y9Aqf.png"
+@sio.on('receive_text')
+def on_receive_text(data):
+    print(f"Received text from server: {data['text']}")
 
-    # Step 1: Upload Image
-    if os.path.exists(image_path):
-        upload_image(image_path)
-    else:
-        print("Image file not found!")
 
-    # Step 2: Connect to WebSocket and communicate
-    asyncio.run(websocket_client())
+def send_image(image_path):
+    with open(image_path, "rb") as image_file:
+        encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+        sio.emit('send_image', {'image': encoded_image})
+
+
+if __name__ == '__main__':
+    sio.connect('http://localhost:8000/ws')  # Ensure the correct endpoint is used
+    # Send an image
+    send_image("captcha_08609_y9Aqf.png")
+    # Wait for the response
+    sio.wait()

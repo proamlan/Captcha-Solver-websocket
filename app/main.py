@@ -21,13 +21,13 @@ clients = {}
 @app.post("/upload")
 async def upload_image(image: UploadFile = File(...)):
     # Save the uploaded image
-    image_path = Path('static/received_image.png')
+    image_path = Path('../static/received_image.png')
     with image_path.open('wb') as f:
         f.write(await image.read())
 
     # Notify all connected WebSocket clients that the image has been received
     for client_id, client in clients.items():
-        await client.send_text("Image received")
+        await client.send_json({"message": "Image received"})
 
     return {"message": "Image received and saved."}
 
@@ -39,22 +39,21 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
 
     try:
         while True:
-            # Wait for text input from the webpage
-            text = await websocket.receive_text()
-            print("received text: " + text)
-            for client_id, client in clients.items():
-                await client.send_text("Image received")
-
-            # Echo the received text back to the client
-            await websocket.send_text(f"Received text: {text}")
+            message = await websocket.receive_text()
+            print("Received text: " + message)
+            # Send received text to all connected clients
+            for cid, client in clients.items():
+                if cid != client_id:
+                    await client.send_json({"message": f"Received text: {message}"})
     except WebSocketDisconnect:
         del clients[client_id]
-
+    except Exception as e:
+        print(e.__str__())
 
 @app.get("/", response_class=HTMLResponse)
 async def get(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, log_level="debug")
