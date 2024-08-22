@@ -49,6 +49,15 @@ async def handle_image(sid, data):
         print(f"Error handling image: {e}")
 
 
+@sio.on('refresh')
+async def handle_refresh(sid):
+    print("refresh clicked")
+    try:
+        await sio.emit("refresh")
+    except Exception as e:
+        print(f"Error refreshing captcha : {e}")
+
+
 @sio.on('send_text')
 async def handle_text(sid, data):
     try:

@@ -6,7 +6,7 @@ import websockets
 import base64
 from playwright.async_api import async_playwright
 
-isHeadless = True
+isHeadless = False
 
 
 async def extract_data(page):
@@ -44,7 +44,7 @@ async def extract_data(page):
     return result
 
 
-async def send_image_to_socketio(image_data):
+async def send_image_to_socketio(image_data, page):
     sio = socketio.AsyncClient(logger=True, engineio_logger=True)
     uri = "http://0.0.0.0:8000"  # Adjust this to your Socket.IO server address
 
@@ -65,6 +65,14 @@ async def send_image_to_socketio(image_data):
         print(f"Received OCR result: {data}")
         ocr_result = data
         ocr_event.set()
+
+    @sio.event
+    async def refresh():
+        print("Refresh event received, refreshing CAPTCHA...")
+        await refresh_captcha(page)
+        await asyncio.sleep(1)  # Small delay to allow for CAPTCHA reload
+        await sio.emit('refresh_completed')
+        # await send_image_to_socketio(page)
 
     @sio.event
     def connect_error(data):
@@ -103,6 +111,24 @@ async def send_image_to_socketio(image_data):
         return ""
 
 
+async def refresh_captcha(page):
+
+    await page.click('#canvas')
+    # await page.click(canvas_element)
+
+    # canvas_image = await canvas_element.screenshot()
+    # print(canvas_element.__str__())
+
+    print("CAPTCHA refreshed and screenshot taken.")
+    # await send_image_to_socketio(page)
+    # return canvas_image
+    # Get the canvas element and take a screenshot
+    await asyncio.sleep(2)  # Small delay to allow for CAPTCHA reload
+    canvas_element = page.locator('#canvas')
+    canvas_image = await canvas_element.screenshot()
+    await send_image_to_socketio(canvas_image)
+
+
 async def run():
     async with async_playwright() as playwright:
         # Launch a new browser instance
@@ -129,7 +155,7 @@ async def run():
         canvas_image = await canvas_element.screenshot()
 
         # Send the image to the Socket.IO server for OCR
-        ocr_text = await send_image_to_socketio(canvas_image)
+        ocr_text = await send_image_to_socketio(canvas_image, page)
 
         if ocr_text:
             print(f"Received OCR text: {ocr_text}")
