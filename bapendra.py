@@ -6,6 +6,8 @@ import websockets
 import base64
 from playwright.async_api import async_playwright
 
+isHeadless = True
+
 
 async def extract_data(page):
     # Find the first table (Identitas Kendaraan)
@@ -104,7 +106,7 @@ async def send_image_to_socketio(image_data):
 async def run():
     async with async_playwright() as playwright:
         # Launch a new browser instance
-        browser = await playwright.chromium.launch(headless=False)  # Set to True for headless mode
+        browser = await playwright.chromium.launch(headless=isHeadless)  # Set to True for headless mode
         context = await browser.new_context()
 
         # Open a new page
