@@ -52,11 +52,6 @@ async def handle_image(sid, data):
 
 @sio.on('send_text')
 async def handle_text(sid, data):
-    # try:
-    #     # Send the entered text back to the original client
-    #     await sio.emit('receive_text', {'text': data['text']}, room=sid)
-    # except Exception as e:
-    #     print(f"Error handling text: {e}")
     try:
         print(f"Received text from client {sid}: {data['text']}")
         # Send the entered text back to all clients
