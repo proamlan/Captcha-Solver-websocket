@@ -1,4 +1,3 @@
-# client.py
 import base64
 import socketio
 
@@ -21,14 +20,23 @@ def on_receive_text(data):
 
 
 def send_image(image_path):
-    with open(image_path, "rb") as image_file:
-        encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
-        sio.emit('send_image', {'image': encoded_image})
+    try:
+        with open(image_path, "rb") as image_file:
+            encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+            sio.emit('send_image', {'image': encoded_image})
+    except Exception as e:
+        print(f"Error sending image: {e}")
 
 
 if __name__ == '__main__':
-    sio.connect('http://localhost:8000/ws')  # Ensure the correct endpoint is used
+    sio.connect('http://localhost:8000')
     # Send an image
     send_image("captcha_08609_y9Aqf.png")
-    # Wait for the response
-    sio.wait()
+
+    # Keep the client running to receive text
+    try:
+        sio.wait()
+    except KeyboardInterrupt:
+        print("Client stopped by user")
+    finally:
+        sio.disconnect()

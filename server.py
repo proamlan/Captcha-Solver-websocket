@@ -26,7 +26,9 @@ app.mount("/socket.io", socketio.ASGIApp(sio, socketio_path="socket.io"))
 @app.get("/")
 async def get():
     # Replace with your own HTML template path if needed
-    return HTMLResponse(content="<h1>Hello, FastAPI with Socket.IO!</h1>", status_code=200)
+    # return HTMLResponse(content="<h1>Hello, FastAPI with Socket.IO!</h1>", status_code=200)
+    with open("templates/index.html") as f:
+        return HTMLResponse(content=f.read(), status_code=200)
 
 
 @sio.event
@@ -41,20 +43,26 @@ async def disconnect(sid):
 
 @sio.on('send_image')
 async def handle_image(sid, data):
-    # Decode the image from base64
-    image_data = base64.b64decode(data['image'])
-    # Save the image to display it
-    with open("received_image.png", "wb") as f:
-        f.write(image_data)
-
-    # Emit an event to the client-side for user input
-    await sio.emit('display_image', {'image': data['image']}, room=sid)
+    try:
+        # Emit the image to be displayed on the webpage
+        await sio.emit('display_image', {'image': data['image']})
+    except Exception as e:
+        print(f"Error handling image: {e}")
 
 
 @sio.on('send_text')
 async def handle_text(sid, data):
-    # Send the user input back to the client
-    await sio.emit('receive_text', {'text': data['text']}, room=sid)
+    # try:
+    #     # Send the entered text back to the original client
+    #     await sio.emit('receive_text', {'text': data['text']}, room=sid)
+    # except Exception as e:
+    #     print(f"Error handling text: {e}")
+    try:
+        print(f"Received text from client {sid}: {data['text']}")
+        # Send the entered text back to all clients
+        await sio.emit('receive_text', {'text': data['text']})
+    except Exception as e:
+        print(f"Error handling text: {e}")
 
 
 if __name__ == '__main__':
