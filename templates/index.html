@@ -16,7 +16,6 @@
         style="max-width: 100%"
       />
     </div>
-    <button id="refresh">Refresh</button>
     <h2>Enter Text:</h2>
     <input type="text" id="user-input" placeholder="Enter your text here" />
     <button id="submit-button">Submit</button>
@@ -35,11 +34,13 @@
 
       document.getElementById("submit-button").onclick = function () {
         const userInput = document.getElementById("user-input").value;
+        document.getElementById("user-input").value = '' ;
         socket.emit("send_text", { text: userInput });
       };
 
-      document.getElementById("refresh").onclick = function () {
+      document.getElementById("displayed-image").onclick = function () {
         socket.emit("refresh");
+        document.getElementById("user-input").value = '' ;
       };
 
       socket.on("disconnect", () => {

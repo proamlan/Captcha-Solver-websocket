@@ -1,12 +1,22 @@
 import json
 import asyncio
+import os
 
 import socketio
 import websockets
 import base64
+
+from dotenv import load_dotenv
 from playwright.async_api import async_playwright
 
-isHeadless = False
+# Load environment variables from .env file
+load_dotenv()
+
+# Load variables from the environment
+isHeadless = os.getenv("IS_HEADLESS", "False").lower() in ("true", "1", "yes")
+socketio_uri = os.getenv("SOCKETIO_URI", "http://0.0.0.0:8000")
+page_url = os.getenv("PAGE_URL", "https://bapenda.jatimprov.go.id/info/pkb")
+nopol_value = os.getenv("NOPOL_VALUE", "L 1554 RL")
 
 
 async def extract_data(page):
@@ -44,7 +54,29 @@ async def extract_data(page):
     return result
 
 
-async def send_image_to_socketio(image_data, page):
+async def send_image_to_socketio(image_data, sio):
+    # Encode the image data to base64
+    encoded_image = base64.b64encode(image_data).decode('utf-8')
+
+    # Send the image data
+    await sio.emit('send_image', {
+        "image": encoded_image,
+        "text": "Perform OCR on this image"
+    })
+    print("Image sent, waiting for OCR result...")
+
+
+async def refresh_captcha(page, sio):
+    await page.click('#canvas')
+    print("CAPTCHA refreshed.")
+    await asyncio.sleep(2)  # Small delay to allow for CAPTCHA reload
+    canvas_element = page.locator('#canvas')
+    canvas_image = await canvas_element.screenshot()
+    await send_image_to_socketio(canvas_image, sio)
+    print("Refreshed CAPTCHA image sent to server.")
+
+
+async def run():
     sio = socketio.AsyncClient(logger=True, engineio_logger=True)
     uri = "http://0.0.0.0:8000"  # Adjust this to your Socket.IO server address
 
@@ -69,121 +101,54 @@ async def send_image_to_socketio(image_data, page):
     @sio.event
     async def refresh():
         print("Refresh event received, refreshing CAPTCHA...")
-        await refresh_captcha(page)
-        await asyncio.sleep(1)  # Small delay to allow for CAPTCHA reload
+        await refresh_captcha(page, sio)
         await sio.emit('refresh_completed')
-        # await send_image_to_socketio(page)
 
     @sio.event
     def connect_error(data):
         print(f"Connection error: {data}")
 
-    try:
-        await sio.connect(uri)
-        print("Connected to server, sending image...")
-
-        # Encode the image data to base64
-        encoded_image = base64.b64encode(image_data).decode('utf-8')
-
-        # Send the image data
-        await sio.emit('send_image', {
-            "image": encoded_image,
-            "text": "Perform OCR on this image"
-        })
-        print("Image sent, waiting for OCR result...")
-
-        # Wait for the OCR result with a timeout
-        try:
-            await asyncio.wait_for(ocr_event.wait(), timeout=30)  # 30 seconds timeout
-        except asyncio.TimeoutError:
-            print("Timeout waiting for OCR result")
-
-        print("Disconnecting from server...")
-        await sio.disconnect()
-
-        if ocr_result:
-            return ocr_result.get('text', '')
-        else:
-            print("No OCR result received")
-            return ''
-    except Exception as e:
-        print(f"Socket.IO connection error: {e}")
-        return ""
-
-
-async def refresh_captcha(page):
-
-    await page.click('#canvas')
-    # await page.click(canvas_element)
-
-    # canvas_image = await canvas_element.screenshot()
-    # print(canvas_element.__str__())
-
-    print("CAPTCHA refreshed and screenshot taken.")
-    # await send_image_to_socketio(page)
-    # return canvas_image
-    # Get the canvas element and take a screenshot
-    await asyncio.sleep(2)  # Small delay to allow for CAPTCHA reload
-    canvas_element = page.locator('#canvas')
-    canvas_image = await canvas_element.screenshot()
-    await send_image_to_socketio(canvas_image)
-
-
-async def run():
     async with async_playwright() as playwright:
-        # Launch a new browser instance
-        browser = await playwright.chromium.launch(headless=isHeadless)  # Set to True for headless mode
+        browser = await playwright.chromium.launch(headless=isHeadless)
         context = await browser.new_context()
-
-        # Open a new page
         page = await context.new_page()
 
-        # Navigate to the webpage
         await page.goto("https://bapenda.jatimprov.go.id/info/pkb")
-
-        # Wait for the page to load completely
         await page.wait_for_load_state("load")
-
-        # Find the input element with name "nopol" and enter the vehicle registration number
         await page.fill('input[name="nopol"]', 'L 1554 RL')
-
-        # Wait for 1 second
         await asyncio.sleep(1)
 
-        # Get the canvas element and take a screenshot
-        canvas_element = page.locator('#canvas')
-        canvas_image = await canvas_element.screenshot()
+        try:
+            await sio.connect(uri)
 
-        # Send the image to the Socket.IO server for OCR
-        ocr_text = await send_image_to_socketio(canvas_image, page)
+            canvas_element = page.locator('#canvas')
+            canvas_image = await canvas_element.screenshot()
+            await send_image_to_socketio(canvas_image, sio)
 
-        if ocr_text:
-            print(f"Received OCR text: {ocr_text}")
-            # Fill the OCR result into the CAPTCHA input field
-            await page.fill('input[name="code"]', ocr_text)
+            try:
+                await asyncio.wait_for(ocr_event.wait(), timeout=30)
+            except asyncio.TimeoutError:
+                print("Timeout waiting for OCR result")
 
-            await page.click('#valid')
+            if ocr_result:
+                print(f"Received OCR text: {ocr_result['text']}")
+                await page.fill('input[name="code"]', ocr_result['text'])
+                await page.click('#valid')
+                await page.wait_for_timeout(1000)
+                print("Form submitted with OCR text:", ocr_result['text'])
+                await page.wait_for_load_state("load")
 
-            # For example, you might want to wait for a navigation or some change on the page
-            await page.wait_for_timeout(1000)  # Wait 1 second to observe the click effect
+                data = await extract_data(page)
+                json_data = json.dumps(data, indent=4)
+                print(json_data)
+            else:
+                print("Failed to retrieve OCR text")
 
-            # Log the result
-            print("Form submitted with OCR text:", ocr_text)
-
-            # Wait for the page to load after submission
-            await page.wait_for_load_state("load")
-
-            # Extract the data
-            data = await extract_data(page)
-
-            # Convert the data to JSON and print it
-            json_data = json.dumps(data, indent=4)
-            print(json_data)
-        else:
-            print("Failed to retrieve OCR text")
-
-        # Close the browser
-        await browser.close()
+        except Exception as e:
+            print(f"Error: {e}")
+        finally:
+            await sio.disconnect()
+            await browser.close()
 
 
 if __name__ == '__main__':
