@@ -26,7 +26,6 @@ app.mount("/socket.io", socketio.ASGIApp(sio, socketio_path="socket.io"))
 @app.get("/")
 async def get():
     # Replace with your own HTML template path if needed
-    # return HTMLResponse(content="<h1>Hello, FastAPI with Socket.IO!</h1>", status_code=200)
     with open("templates/index.html") as f:
         return HTMLResponse(content=f.read(), status_code=200)
 

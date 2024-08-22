@@ -57,8 +57,8 @@ async def send_image_to_socketio(image_data):
     def disconnect():
         print("Disconnected from Socket.IO server")
 
-    @sio.on('ocr_result')
-    def on_ocr_result(data):
+    @sio.on('receive_text')
+    def on_receive_text(data):
         nonlocal ocr_result
         print(f"Received OCR result: {data}")
         ocr_result = data
@@ -130,11 +130,14 @@ async def run():
         ocr_text = await send_image_to_socketio(canvas_image)
 
         if ocr_text:
+            print(f"Received OCR text: {ocr_text}")
             # Fill the OCR result into the CAPTCHA input field
-            await page.fill('input[name="captcha_field"]', ocr_text)  # Adjust the selector to your captcha field
+            await page.fill('input[name="code"]', ocr_text)
 
-            # Submit the form
-            await page.click('button[type="submit"]')
+            await page.click('#valid')
+
+            # For example, you might want to wait for a navigation or some change on the page
+            await page.wait_for_timeout(1000)  # Wait 1 second to observe the click effect
 
             # Log the result
             print("Form submitted with OCR text:", ocr_text)
